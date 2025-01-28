@@ -106,9 +106,6 @@ class MongoMain:
             logging.error(f"Erro ao carregar endereços gerados: {e}")
             return set()
 
-    def int_to_hex(self, value):
-        return hex(value)[2:].zfill(64)
-
     def save_state(self, key_int):
         key_int = str(key_int)
         self.state_collection.update_one({}, {"$set": {"state": key_int}})

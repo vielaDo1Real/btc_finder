@@ -58,7 +58,7 @@ class Bip39V:
     def generate_combinations(self, words, num_words):
         words = list(set(words))  # Deduplicate input words
         total_combinations = itertools.combinations(words, num_words)
-        with ProcessPoolExecutor() as executor:
+        with ThreadPoolExecutor() as executor:
             futures = []
             for combo in tqdm(total_combinations, desc="Gerando combinações", unit=" frases"):
                 futures.append(executor.submit(self.process_combination_seq, combo))
@@ -84,7 +84,7 @@ class Bip39V:
         total_combinations = itertools.combinations(words, num_words)
         
         # Use ProcessPool para processar as combinações em paralelo
-        with ProcessPoolExecutor() as executor:
+        with ThreadPoolExecutor() as executor:
             # Crie uma lista para as tarefas
             futures = []
             
@@ -93,10 +93,7 @@ class Bip39V:
                 combo_str = " ".join(combo)  # Combinação como string
                 futures.append(executor.submit(self.process_combination, combo_str))
                 
-    def verify_seed(self, target_address, batch_size=1000000, num_threads=1):
-        """
-        Verifica combinações na base de dados para encontrar um endereço-alvo.
-        """
+    def verify_seed(self, target_address, batch_size=100, num_threads=1):
         try:
             start_time = time.time()
 
@@ -105,17 +102,17 @@ class Bip39V:
                 num_threads = self.utils.get_cpu_cores()
 
             # Garantir que exista um índice no campo 'is_verified' para acelerar as consultas
-            attempts_collection.create_index([("is_verified", ASCENDING)], background=True)
+            self.db.attempts_collection.create_index([("is_verified", ASCENDING)], background=True)
 
             # Busca apenas documentos não verificados, sem carregar tudo em memória
-            cursor = attempts_collection.find({"is_verified": False}).batch_size(batch_size)
+            cursor = self.db.attempts_collection.find({"is_verified": False}).batch_size(batch_size)
 
             # Inicializa tqdm com o total de documentos não verificados
-            total_docs = attempts_collection.count_documents({"is_verified": False})
+            total_docs = self.db.attempts_collection.count_documents({"is_verified": False})
             lock = Lock()
 
             # Função para processar um lote de dados
-            def process_batch(batch, pbar):
+            def process_batch(batch):
                 updates = []
                 for doc in batch:
                     combination = doc['combination']
@@ -150,11 +147,13 @@ class Bip39V:
                     for doc in cursor:
                         batch.append(doc)
                         if len(batch) >= batch_size:
-                            executor.submit(process_batch, batch, pbar)
+                            executor.submit(process_batch, batch)
                             batch = []
                     # Processa o último lote, se houver
                     if batch:
-                        executor.submit(process_batch, batch, pbar)
+                        executor.submit(process_batch, batch)
+                
+                executor.shutdown(wait=True)
 
             logging.info("Nenhum endereço correspondente encontrado.")
             self.utils.exec_time(start_time=start_time, mode='Verify')

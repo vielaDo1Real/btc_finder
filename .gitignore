@@ -135,4 +135,6 @@ cython_debug/
 # files
 address.txt
 addresses.csv
-
+bip39_v1.py.old
+file_wallets.py
+check_wallet_balance.py

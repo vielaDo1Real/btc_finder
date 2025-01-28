@@ -152,7 +152,7 @@ class HexV():
                     pbar.update(len(batch))
 
             # Dividindo o cursor em lotes e processando em paralelo
-            with tqdm(total=total_docs, desc="Verificando endereços", unit=" combinações") as pbar:
+            with tqdm(total=total_docs, desc="Verificando endereços", unit=" chaves") as pbar:
                 with ThreadPoolExecutor(max_workers=num_threads) as executor:
                     batch = []
                     for doc in cursor:
