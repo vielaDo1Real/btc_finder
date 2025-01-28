@@ -1,0 +1,126 @@
+import itertools
+import random
+from mnemonic import Mnemonic
+from bip_utils import Bip39SeedGenerator, Bip44, Bip44Coins
+import logging
+from tqdm import tqdm
+from word_compare import WordCompare
+from btc_find_utils import BtcFindUtils
+from  mongo_main import MongoMain
+from pymongo import MongoClient
+import time
+
+client = MongoClient('localhost', 27017)
+db = client['bip39']
+attempts_collection = db['bip39_attempts']
+verified_collection = db['bip39_verified']
+
+
+class Bip39V:
+    def __init__(self):
+        self.db = MongoMain('bip39')
+        self.utils = BtcFindUtils()
+        
+        # Inicializa as combinações tentadas
+        try:
+            self.attempted_combinations = self.db.load_objects('attempts')
+            if not self.attempted_combinations:
+                self.attempted_combinations = []  # Caso o banco retorne None ou vazio
+        except Exception as e:
+            logging.warning(f"Erro ao carregar 'attempts' do banco de dados: {e}")
+            self.attempted_combinations = []  # Garante que seja uma lista mesmo em caso de erro
+        
+        # Inicializa as combinações verificadas
+        try:
+            self.verified_combinations = self.db.load_objects('verified')
+            if not self.verified_combinations:
+                self.verified_combinations = []
+        except Exception as e:
+            logging.warning(f"Erro ao carregar 'verified' do banco de dados: {e}")
+            self.verified_combinations = []
+
+    
+    # Gerar combinações únicas
+    def generate_combinations(self, words, num_words):
+        words = list(set(words))  # Deduplicate input words
+        total_combinations = itertools.combinations(words, num_words)
+        for combo in tqdm(total_combinations, desc="Gerando combinações"):
+            try:
+                normalized = self.utils.normalize_combination(combo)
+                seed = Bip39SeedGenerator(normalized).Generate()
+                bip44 = Bip44.FromSeed(seed, Bip44Coins.BITCOIN)
+                address = bip44.PublicKey().ToAddress()
+                if normalized not in self.attempted_combinations:
+                    try:
+                        self.db.log_attempt('null', normalized, address)
+                        self.attempted_combinations.append(normalized)
+                    except:
+                        logging.debug(f"Combinação duplicada ignorada: {normalized}")
+            except Exception as e:
+                pass
+        #logging.error(f"Erro ao gerar combinações: {e}")
+
+    # Gerar combinações aleatórias
+    def generate_random_combinations(self, words, num_words):
+        words = list(set(words))
+        total_combinations = itertools.combinations(words, num_words)
+        for _ in tqdm(total_combinations, desc="Gerando subsets aleatórios", unit=" frases"):
+            combo = " ".join(random.sample(words, num_words))
+            if combo not in self.attempted_combinations:
+                try:
+                    seed = Bip39SeedGenerator(combo).Generate()
+                    bip44 = Bip44.FromSeed(seed, Bip44Coins.BITCOIN)
+                    address = bip44.PublicKey().ToAddress()
+                    try:
+                        self.db.log_attempt('null', combo, address)
+                        self.attempted_combinations.append(combo)
+                    except :
+                        logging.warning(f"Combinação duplicada ignorada: {combo}")
+                except Exception as e:
+                    pass
+    
+    # Verificar a seed gerada
+    def verify_seed(self, target_address):
+        try:
+            verified_combinations = [i for i in self.db.load_objects('attempts') if i['is_verified'] == True]
+            unverified_combinations = [i for i in self.db.load_objects('attempts') if i['is_verified'] == False]
+
+            if not unverified_combinations:
+                logging.info("Não há combinações pendentes para verificação.")
+                return "Não há combinações pendentes para verificação."
+
+            # Progress bar for checking addresses 
+            start_time = time.time()
+            with tqdm(total=len(unverified_combinations), desc="Verificando endereços", unit=" frases") as pbar:
+                for entry in unverified_combinations:
+                    combination = entry['combination']
+                    address = entry['address']
+                    verified = entry['is_verified']
+                    if address == target_address:
+                        logging.info(f"Endereço correspondente encontrado: {address} para a combinação: {combination}")
+
+                        # Update the status to 'found' in MongoDB
+                        result = db['bip39_attempts'].update_one(
+                            {"address": address},
+                            {"$set": {"status": "found", "is_verified": True}}
+                        )
+                        if result.modified_count > 0:
+                            logging.info(f"Combinação verificada e marcada como encontrada: {combination}")
+                        return f"Endereço correspondente encontrado: {address}"
+                    else:
+                        # Mark as verified even if not found
+                        result = db['bip39_attempts'].update_one(
+                            {"address": address},
+                            {"$set": {"status": "not found", "is_verified": True}}
+                        )
+                        if result.modified_count > 0:
+                            continue
+                            # logging.info(f"Combinação verificada: {combination}")
+                        pbar.update(1)
+
+                logging.info("Nenhum endereço correspondente encontrado.")
+                self.utils.exec_time(start_time=start_time, mode='Verify')
+        except Exception as e:
+            logging.error(f"Erro ao verificar endereços: {e}")
+            return f"Erro: {e}"
+

@@ -1,0 +1,165 @@
+import itertools
+from bip_utils import Bip39SeedGenerator, Bip44, Bip44Coins
+import logging
+from tqdm import tqdm
+from pymongo import MongoClient, UpdateOne, ASCENDING
+import time
+from concurrent.futures import ThreadPoolExecutor,ProcessPoolExecutor
+from threading import Lock
+
+from btc_find_utils import BtcFindUtils
+from  mongo_main import MongoMain
+
+client = MongoClient('localhost', 27017)
+db = client['bip39']
+attempts_collection = db['bip39_attempts']
+verified_collection = db['bip39_verified']
+
+
+class Bip39V:
+    def __init__(self):
+        self.db = MongoMain('bip39')
+        self.utils = BtcFindUtils()
+        self.attempted_combinations = set()
+        # Inicializa as combinações tentadas
+        try:
+            self.attempted_combinations = self.db.load_objects('attempts')
+            if not self.attempted_combinations:
+                self.attempted_combinations = set()  # Caso o banco retorne None ou vazio
+        except Exception as e:
+            logging.warning(f"Erro ao carregar 'attempts' do banco de dados: {e}")
+            self.attempted_combinations = set()  # Garante que seja um set mesmo em caso de erro
+        
+        # Inicializa as combinações verificadas
+        try:
+            self.verified_combinations = self.db.load_objects('verified')
+            if not self.verified_combinations:
+                self.verified_combinations = []
+        except Exception as e:
+            logging.warning(f"Erro ao carregar 'verified' do banco de dados: {e}")
+            self.verified_combinations = []
+
+    def process_combination_seq(self, combo):
+        if combo not in self.attempted_combinations:
+            try:
+                normalized = self.utils.normalize_combination(combo)
+                seed = Bip39SeedGenerator(normalized).Generate()
+                bip44 = Bip44.FromSeed(seed, Bip44Coins.BITCOIN)
+                address = bip44.PublicKey().ToAddress()
+                try:
+                    self.db.log_attempt('null', normalized, address, 'not found', False, 'insert')
+                    self.attempted_combinations.append(normalized)
+                except Exception as e:
+                    logging.warning(f"Combinação duplicada ignorada: {normalized}")
+            except Exception as e:
+                pass
+
+    # Gerar combinações únicas
+    def generate_combinations(self, words, num_words):
+        words = list(set(words))  # Deduplicate input words
+        total_combinations = itertools.combinations(words, num_words)
+        with ProcessPoolExecutor() as executor:
+            futures = []
+            for combo in tqdm(total_combinations, desc="Gerando combinações", unit=" frases"):
+                futures.append(executor.submit(self.process_combination_seq, combo))
+                
+        #logging.error(f"Erro ao gerar combinações: {e}")
+
+    def process_combination(self, combo):
+        if combo not in self.attempted_combinations:
+            try:
+                seed = Bip39SeedGenerator(combo).Generate()
+                bip44 = Bip44.FromSeed(seed, Bip44Coins.BITCOIN)
+                address = bip44.PublicKey().ToAddress()
+                try:
+                    self.db.log_attempt('null', combo, address, 'not found', False, 'insert')
+                    self.attempted_combinations.append(combo)
+                except Exception as e:
+                    logging.warning(f"Combinação duplicada ignorada: {combo}")
+            except Exception as e:
+                pass
+
+    def generate_random_combinations(self, words, num_words):
+        words = list(set(words))
+        total_combinations = itertools.combinations(words, num_words)
+        
+        # Use ProcessPool para processar as combinações em paralelo
+        with ProcessPoolExecutor() as executor:
+            # Crie uma lista para as tarefas
+            futures = []
+            
+            # Para cada combinação, envie para execução paralela
+            for combo in tqdm(total_combinations, desc="Gerando combinações aleatórias", unit=" frases"):
+                combo_str = " ".join(combo)  # Combinação como string
+                futures.append(executor.submit(self.process_combination, combo_str))
+                
+    def verify_seed(self, target_address, batch_size=1000000, num_threads=1):
+        """
+        Verifica combinações na base de dados para encontrar um endereço-alvo.
+        """
+        try:
+            start_time = time.time()
+
+            # Define número de threads baseado no número de CPUs disponíveis
+            if num_threads is None:
+                num_threads = self.utils.get_cpu_cores()
+
+            # Garantir que exista um índice no campo 'is_verified' para acelerar as consultas
+            attempts_collection.create_index([("is_verified", ASCENDING)], background=True)
+
+            # Busca apenas documentos não verificados, sem carregar tudo em memória
+            cursor = attempts_collection.find({"is_verified": False}).batch_size(batch_size)
+
+            # Inicializa tqdm com o total de documentos não verificados
+            total_docs = attempts_collection.count_documents({"is_verified": False})
+            lock = Lock()
+
+            # Função para processar um lote de dados
+            def process_batch(batch, pbar):
+                updates = []
+                for doc in batch:
+                    combination = doc['combination']
+                    address = doc['address']
+                    updates.append({
+                        'filter': {'_id': doc['_id']},
+                        'update': {
+                            '$set': {
+                                'priv_key_hex': 'null',
+                                'phrase': combination,
+                                'address': address,
+                                'status': 'found' if address == target_address else 'not found',
+                                'is_verified': True
+                            }
+                        }
+                    })
+
+                # Atualização em lote no MongoDB
+                if updates:
+                    attempts_collection.bulk_write(
+                        [UpdateOne(u['filter'], u['update']) for u in updates]
+                    )
+                
+                # Atualiza a barra de progresso
+                with lock:
+                    pbar.update(len(batch))
+
+            # Dividindo o cursor em lotes e processando em paralelo
+            with tqdm(total=total_docs, desc="Verificando endereços", unit=" combinações") as pbar:
+                with ThreadPoolExecutor(max_workers=num_threads) as executor:
+                    batch = []
+                    for doc in cursor:
+                        batch.append(doc)
+                        if len(batch) >= batch_size:
+                            executor.submit(process_batch, batch, pbar)
+                            batch = []
+                    # Processa o último lote, se houver
+                    if batch:
+                        executor.submit(process_batch, batch, pbar)
+
+            logging.info("Nenhum endereço correspondente encontrado.")
+            self.utils.exec_time(start_time=start_time, mode='Verify')
+            return "Nenhum endereço correspondente encontrado."
+
+        except Exception as e:
+            logging.error(f"Erro ao verificar endereços: {e}")
+            return f"Erro: {e}"
