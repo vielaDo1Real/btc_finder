@@ -21,3 +21,4 @@ python3 -m pip install -r requirements.txt
 ```
 python3 btc_finder.py
 ```
+[![Vídeo do YouTube]](https://www.youtube.com/watch?v=igaNrEXukRA)
