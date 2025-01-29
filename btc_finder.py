@@ -48,18 +48,19 @@ def main():
                     hex_finder.process_range_random(start=start, stop=stop, attempted_keys=attempted_keys)
             
     elif option == '2':
-        word_l = WordCompare('bip39_english.txt', 'bip39_portuguese.txt')
-        text_file = input('Write the file name: ')
-        word_text = word_l.load_wordlist(text_file)
-        word_p = word_l.preprocess_text(word_text)
-        word = word_l.find_possible_words(word_p, language="portuguese")
-        num_words = int(input("Digite o número de palavras para gerar as combinações: "))
+        
         target_address = '1EciYvS7FFjSYfrWxsWYjGB8K9BobBfCXw'
         option = input("Deseja apenas gerar as chaves (1), apenas verificar os endereços gerados (2) ou gerar e verificar (3)? Escolha: ")
         with concurrent.futures.ThreadPoolExecutor() as executor:
             try:
                 bip39_finder = Bip39V()
                 if option == '1':
+                    word_l = WordCompare('bip39_english.txt', 'bip39_portuguese.txt')
+                    text_file = input('Escreva o nome do arquivo com o texto: ')
+                    word_text = word_l.load_wordlist(text_file)
+                    word_p = word_l.preprocess_text(word_text)
+                    word = word_l.find_possible_words(word_p, language="portuguese")
+                    num_words = int(input("Digite o número de palavras para gerar as combinações: "))
                     type_gen = input("Para geração sequencial (1) ou (2) para randômico? Escolha: ")
                     if type_gen == '1':
                         type_gen = 'sequence'
