@@ -1,10 +1,11 @@
 import itertools
 from bip_utils import Bip39SeedGenerator, Bip44, Bip44Coins
 import logging
+import random
 from tqdm import tqdm
 from pymongo import MongoClient, UpdateOne, ASCENDING
 import time
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from threading import Lock
 
 from btc_find_utils import BtcFindUtils
@@ -52,6 +53,7 @@ class Bip39V:
                 except Exception as e:
                     logging.warning(f"Combinação duplicada ignorada: {normalized}")
             except Exception as e:
+                self.db.log_attempt('null', normalized, "Bip39SeedGenerator", 'error', False, 'insert') # Insere as combinações que deram erro para aumentar a base de combinações já geradas
                 pass
 
     # Gerar combinações únicas
@@ -61,8 +63,10 @@ class Bip39V:
         with ThreadPoolExecutor() as executor:
             futures = []
             for combo in tqdm(total_combinations, desc="Gerando combinações", unit=" frases"):
-                futures.append(executor.submit(self.process_combination_seq, combo))
-                
+                future = executor.submit(self.process_combination_seq, combo)
+                if future.result():
+                    futures.append(future)
+
         #logging.error(f"Erro ao gerar combinações: {e}")
 
     def process_combination(self, combo):
@@ -74,24 +78,34 @@ class Bip39V:
                 try:
                     self.db.log_attempt('null', combo, address, 'not found', False, 'insert')
                     self.attempted_combinations.append(combo)
+                    return True
                 except Exception as e:
                     logging.warning(f"Combinação duplicada ignorada: {combo}")
+                    return False  # Retorna False se houve uma exceção ao registrar a tentativa
             except Exception as e:
+                self.db.log_attempt('null', combo, "Bip39SeedGenerator", 'error', False, 'insert') # Insere as combinações que deram erro para aumentar a base de combinações já geradas
                 pass
+                return False  # Retorna False se houve uma exceção ao gerar o endereço
+        return False  # Retorna False se a combinação já foi tentada
 
     def generate_random_combinations(self, words, num_words):
         words = list(set(words))
         total_combinations = itertools.combinations(words, num_words)
         
-        # Use ProcessPool para processar as combinações em paralelo
+        # Use ThreadPoolExecutor para processar as combinações em paralelo
         with ThreadPoolExecutor() as executor:
             # Crie uma lista para as tarefas
             futures = []
             
             # Para cada combinação, envie para execução paralela
             for combo in tqdm(total_combinations, desc="Gerando combinações aleatórias", unit=" frases"):
-                combo_str = " ".join(combo)  # Combinação como string
-                futures.append(executor.submit(self.process_combination, combo_str))
+                combo_str = " ".join(random.sample(combo, num_words))  # Combinação como string, embaralhando palavras da combinação 
+                future = executor.submit(self.process_combination, combo_str)
+
+                if future.result():
+                    futures.append(future)
+
+            
                 
     def verify_seed(self, target_address, batch_size=100, num_threads=1):
         try:
@@ -104,11 +118,12 @@ class Bip39V:
             # Garantir que exista um índice no campo 'is_verified' para acelerar as consultas
             self.db.attempts_collection.create_index([("is_verified", ASCENDING)], background=True)
 
+
             # Busca apenas documentos não verificados, sem carregar tudo em memória
-            cursor = self.db.attempts_collection.find({"is_verified": False}).batch_size(batch_size)
+            cursor = self.db.attempts_collection.find({"is_verified": False, "status": {"$ne": "error"}}).batch_size(batch_size)
 
             # Inicializa tqdm com o total de documentos não verificados
-            total_docs = self.db.attempts_collection.count_documents({"is_verified": False})
+            total_docs = self.db.attempts_collection.count_documents({"is_verified": False, "status": {"$ne": "error"}})
             lock = Lock()
 
             # Função para processar um lote de dados
