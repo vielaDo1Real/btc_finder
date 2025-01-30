@@ -12,7 +12,7 @@ from btc_find_utils import BtcFindUtils
 btc_utils = BtcFindUtils()
 db = MongoMain('hex')
 last_state = ''
-# Função principal
+
 def main():
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
     option = input('Para Hex Finder, digite 1. Para Bip39 Finder, digite 2: ')

@@ -1,4 +1,4 @@
-from pymongo import MongoClient, ASCENDING
+from pymongo import MongoClient
 import logging
 import json
 from bson import json_util
@@ -91,7 +91,6 @@ class MongoMain:
     def load_attempted_keys(self):
         try:
             objects = set()
-
             counter = self.attempts_collection.count_documents({})
             if counter:
                 with tqdm.tqdm(total=counter, desc="Carregando endereços gerados.", unit=" endereços") as pbar:

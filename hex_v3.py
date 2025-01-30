@@ -1,12 +1,11 @@
 import random
-import requests
 from bit import Key
 import time
 import logging
 from tqdm import tqdm
 from threading import Lock
-from pymongo import MongoClient, ASCENDING, UpdateOne
-from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
+from pymongo import ASCENDING, UpdateOne
+from concurrent.futures import ThreadPoolExecutor
 
 from mongo_main import MongoMain
 from btc_find_utils import BtcFindUtils

@@ -5,7 +5,7 @@ import random
 from tqdm import tqdm
 from pymongo import MongoClient, UpdateOne, ASCENDING
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
 from threading import Lock
 
 from btc_find_utils import BtcFindUtils
@@ -61,14 +61,16 @@ class Bip39V:
     def generate_combinations(self, words, num_words):
         words = list(set(words))  # Deduplicate input words
         total_combinations = itertools.combinations(words, num_words)
-        with ThreadPoolExecutor() as executor:
-            futures = []
-            for combo in tqdm(total_combinations, desc="Gerando combinações", unit=" frases"):
-                future = executor.submit(self.process_combination_seq, combo)
-                if future.result():
-                    futures.append(future)
-
-        #logging.error(f"Erro ao gerar combinações: {e}")
+        try:
+            with ThreadPoolExecutor() as executor:
+                futures = []
+                for combo in tqdm(total_combinations, desc="Gerando combinações", unit=" frases"):
+                    future = executor.submit(self.process_combination_seq, combo)
+                    if future.result():
+                        futures.append(future)
+        except Exception as e:
+            logging.error(f"Erro ao gerar combinações: {e}")
+            pass
 
     def process_combination(self, combo):
         if combo not in self.attempted_combinations:
@@ -92,21 +94,21 @@ class Bip39V:
     def generate_random_combinations(self, words, num_words):
         words = list(set(words))
         total_combinations = itertools.combinations(words, num_words)
-        
-        # Use ThreadPoolExecutor para processar as combinações em paralelo
-        with ThreadPoolExecutor() as executor:
-            # Crie uma lista para as tarefas
-            futures = []
-            
-            # Para cada combinação, envie para execução paralela
-            for combo in tqdm(total_combinations, desc="Gerando combinações aleatórias", unit=" frases"):
-                combo_str = " ".join(random.sample(combo, num_words))  # Combinação como string, embaralhando palavras da combinação 
-                future = executor.submit(self.process_combination, combo_str)
-
-                if future.result():
-                    futures.append(future)
-
-            
+        try:
+            # Use ThreadPoolExecutor para processar as combinações em paralelo
+            with ThreadPoolExecutor() as executor:
+                # Crie uma lista para as tarefas
+                futures = []
+                
+                # Para cada combinação, envie para execução paralela
+                for combo in tqdm(total_combinations, desc="Gerando combinações aleatórias", unit=" frases"):
+                    combo_str = " ".join(random.sample(combo, num_words))  # Combinação como string, embaralhando palavras da combinação 
+                    future = executor.submit(self.process_combination, combo_str)
+                    if future.result():
+                        futures.append(future)
+        except Exception as e:
+            logging.error(f"Erro ao gerar combinações: {e}")
+            pass    
                 
     def verify_seed(self, target_address, batch_size=100, num_threads=1):
         try:
