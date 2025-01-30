@@ -75,8 +75,12 @@ def main():
                         future_generate = executor.submit(bip39_finder.generate_random_combinations, word, num_words)
                         future_generate.result()
                 elif option == '2':
+                    try:
+                        num_threads = int(input("Digite a quantidade de threads a serem utilizados: "))
+                    except:
+                        num_threads = 1
                     logging.info("Iniciando verificação de frases...\n")
-                    future_verify = executor.submit(bip39_finder.verify_seed, target_address)
+                    future_verify = executor.submit(bip39_finder.verify_seed, target_address, num_threads)
                     future_verify.result()
                 elif option == '3':
                     logging.info("Iniciando geração de combinações e verificação em paralelo...\n")

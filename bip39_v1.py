@@ -24,6 +24,7 @@ class Bip39V:
         self.attempted_combinations = set()
         # Inicializa as combinações tentadas
         try:
+            logging.info("Aguarde... Carregando banco de dados.")
             self.attempted_combinations = self.db.load_objects('attempts')
             if not self.attempted_combinations:
                 self.attempted_combinations = set()  # Caso o banco retorne None ou vazio
