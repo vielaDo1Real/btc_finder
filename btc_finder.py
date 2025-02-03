@@ -55,7 +55,7 @@ def main():
             try:
                 bip39_finder = Bip39V()
                 if option == '1':
-                    word_l = WordCompare('bip39_english.txt', 'bip39_portuguese.txt')
+                    word_l = bip39_finder.bip39_words
                     text_file = input('Escreva o nome do arquivo com o texto: ')
                     word_text = word_l.load_wordlist(text_file)
                     word_p = word_l.preprocess_text(word_text)
@@ -83,6 +83,18 @@ def main():
                     future_verify = executor.submit(bip39_finder.verify_seed, target_address, num_threads)
                     future_verify.result()
                 elif option == '3':
+                    word_l = bip39_finder.bip39_words
+                    text_file = input('Escreva o nome do arquivo com o texto: ')
+                    word_text = word_l.load_wordlist(text_file)
+                    word_p = word_l.preprocess_text(word_text)
+                    word = word_l.find_possible_words(word_p, language="portuguese")
+                    num_words = int(input("Digite o número de palavras para gerar as combinações: "))
+                    type_gen = input("Para geração sequencial (1) ou (2) para randômico? Escolha: ")
+                    if type_gen == '1':
+                        type_gen = 'sequence'
+                    else:
+                        type_gen = 'random'
+                    os.system("cls")
                     logging.info("Iniciando geração de combinações e verificação em paralelo...\n")
                     if type_gen == 'sequence':
                         future_generate = executor.submit(bip39_finder.generate_combinations, word, num_words)
@@ -100,22 +112,6 @@ def main():
                 logging.warning("Execução interrompida pelo usuário.")
                 executor.shutdown(wait=False)
                 sys.exit(1)
-        
-        if option != '2':
-            word_l = WordCompare('bip39_english.txt', 'bip39_portuguese.txt')
-            text_file = input('Write the file name: ')
-            word_text = word_l.load_wordlist(text_file)
-            word_p = word_l.preprocess_text(word_text)
-            word = word_l.find_possible_words(word_p, language="portuguese")
-            num_words = int(input("Digite o número de palavras para gerar as combinações: "))
-            os.system('cls')
-            if option != '2':
-                type_gen = input("Para geração sequencial (1) ou (2) para randômico? Escolha: ")
-                if type_gen == '1':
-                    type_gen = 'sequence'
-                elif type_gen == '2':
-                    type_gen = 'random'
-            os.system('cls')
     else:
         raise ValueError("Opção inválida. Escolha 1 ou 2.")
 

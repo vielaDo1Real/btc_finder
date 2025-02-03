@@ -1,14 +1,16 @@
-import itertools
-from bip_utils import Bip39SeedGenerator, Bip44, Bip44Coins
 import logging
-import random
-from tqdm import tqdm
 from pymongo import MongoClient, UpdateOne, ASCENDING
-import time
+from bip_utils import Bip39SeedGenerator, Bip44, Bip44Coins
+import itertools
 from concurrent.futures import ThreadPoolExecutor
+from tqdm import tqdm
+import random
+import time
+
+from multiprocessing import pool
 from threading import Lock
 
-from btc_find_utils import BtcFindUtils
+from btc_find_utils import BtcFindUtils, WordCompare
 from  mongo_main import MongoMain
 
 client = MongoClient('localhost', 27017)
@@ -22,6 +24,7 @@ class Bip39V:
         self.db = MongoMain('bip39')
         self.utils = BtcFindUtils()
         self.attempted_combinations = set()
+        self.bip39_words = WordCompare('portuguese')
         # Inicializa as combinações tentadas
         try:
             logging.info("Aguarde... Carregando banco de dados.")
