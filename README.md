@@ -22,3 +22,9 @@ python3 -m pip install -r requirements.txt
 python3 btc_finder.py
 ```
 [![Demonstração de uso]](https://www.youtube.com/watch?v=igaNrEXukRA)
+
+![BTC Wallet](apoio/BTC_address.jpg)
+
+![Solana Wallet](apoio/Solana_address.jpg)
+
+![Ethereum/EVM Wallet](apoio/Ethereum-EVM_address.jpg)
