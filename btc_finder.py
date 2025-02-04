@@ -3,7 +3,6 @@ import os
 import logging
 import concurrent.futures
 
-from word_compare import WordCompare
 from mongo_main import MongoMain
 from bip39_v1 import Bip39V
 from hex_v3 import HexV
@@ -35,7 +34,6 @@ def main():
             cores = int(input(f"Escolha a quantidade de cores (Cores disponíveis: {available_cores}):"))
             if cores <= 1 or cores > available_cores:
                 cores = 1
-            processes = []
             range_size = (hex_finder.stop_key_int - hex_finder.start_key_int + 1) // cores
             type_gen = input("Para geração sequencial (1) ou (2) para randômico? Escolha: ")
             os.system("cls")
@@ -48,7 +46,10 @@ def main():
                     hex_finder.process_range_random(start=start, stop=stop, attempted_keys=attempted_keys)
             
     elif option == '2':
-        
+        try:
+            num_threads = int(input(f"Digite o limite de threads a serem utilizados: "))
+        except:
+            num_threads = 1
         target_address = '1EciYvS7FFjSYfrWxsWYjGB8K9BobBfCXw'
         option = input("Deseja apenas gerar as chaves (1), apenas verificar os endereços gerados (2) ou gerar e verificar (3)? Escolha: ")
         with concurrent.futures.ThreadPoolExecutor() as executor:
@@ -69,16 +70,12 @@ def main():
                     os.system("cls")
                     logging.info("Iniciando geração de combinações...\n")
                     if type_gen == 'sequence':
-                        future_generate = executor.submit(bip39_finder.generate_combinations, word, num_words)
+                        future_generate = executor.submit(bip39_finder.generate_combinations, word, num_words, num_threads, type_gen)
                         future_generate.result()
                     elif type_gen == 'random':
-                        future_generate = executor.submit(bip39_finder.generate_random_combinations, word, num_words)
+                        future_generate = executor.submit(bip39_finder.generate_combinations, word, num_words, num_threads, type_gen)
                         future_generate.result()
                 elif option == '2':
-                    try:
-                        num_threads = int(input("Digite a quantidade de threads a serem utilizados: "))
-                    except:
-                        num_threads = 1
                     logging.info("Iniciando verificação de frases...\n")
                     future_verify = executor.submit(bip39_finder.verify_seed, target_address, num_threads)
                     future_verify.result()
@@ -97,13 +94,13 @@ def main():
                     os.system("cls")
                     logging.info("Iniciando geração de combinações e verificação em paralelo...\n")
                     if type_gen == 'sequence':
-                        future_generate = executor.submit(bip39_finder.generate_combinations, word, num_words)
+                        future_generate = executor.submit(bip39_finder.generate_combinations, word, num_words, num_threads, type_gen)
                         future_verify = executor.submit(bip39_finder.verify_seed, target_address)
                         future_generate.result()
                         future_verify.result()
                     elif type_gen == 'random':
-                        future_generate = executor.submit(bip39_finder.generate_random_combinations, word, num_words)
-                        future_verify = executor.submit(bip39_finder.verify_seed, target_address)
+                        future_generate = executor.submit(bip39_finder.generate_combinations, word, num_words, num_threads, type_gen)
+                        future_verify = executor.submit(bip39_finder.verify_seed, target_address, num_threads)
                         future_generate.result()
                         future_verify.result()
                 else:

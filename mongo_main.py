@@ -68,7 +68,7 @@ class MongoMain:
                 "balance": balance
             }, indent=4, default=json_util.default))
         except Exception as e:
-            logging.error(f"Failed to log success: {e}")
+            logging.error(f"Erro ao inserir sucesso: {e}")
 
     def load_objects(self, type_collection):
         try:
@@ -129,3 +129,70 @@ class MongoMain:
             self.state_collection.update_one({}, {"$set": state})
         except Exception as e:
             logging.error(f"Error updating state: {e}")
+
+    def clean_duplicates(self, loaded_objects=None):
+        try:
+            # Usar documentos carregados pela função load_objects, se fornecidos
+            if not loaded_objects:
+                loaded_objects = self.load_objects('attempts')
+
+            # Criar um pipeline de agrupamento de duplicatas na memória
+            duplicates_map = {}
+            print() # pular uma linha antes de exibir a próxima barra
+            for obj in tqdm.tqdm(loaded_objects, desc="Mapeando duplicatas", unit=" documentos", leave=True):
+                combination = obj.get("combination")
+                address = obj.get("address")
+                key = (combination, address)
+
+                if key not in duplicates_map:
+                    duplicates_map[key] = [obj]
+                else:
+                    duplicates_map[key].append(obj)
+
+            # Identificar duplicatas
+            duplicates = [
+                docs for docs in duplicates_map.values() if len(docs) > 1
+            ]
+
+            # Remover duplicatas do banco de dados
+            total_removed = 0
+            print()
+            for group in tqdm.tqdm(duplicates, desc="Removendo duplicatas", unit=" grupos", leave=True):
+                ids_to_remove = [doc["_id"] for doc in group[1:]]  # Manter o primeiro, remover os demais
+                self.attempts_collection.delete_many({"_id": {"$in": ids_to_remove}})
+                total_removed += len(ids_to_remove)
+
+            logging.info(f"Removidos {total_removed} registros duplicados.")
+
+        except Exception as e:
+            logging.error(f"Erro ao remover duplicatas: {e}")
+
+    def get_collection_size_mb(self, loaded_objects=None):
+        """
+        Retorna o espaço utilizado pela coleção em MB, com a possibilidade de
+        calcular o tamanho manualmente usando os objetos carregados.
+        """
+        try:
+            # Caso os objetos já tenham sido carregados
+            if loaded_objects:
+                logging.info("Calculando tamanho da coleção com base nos objetos carregados...")
+
+                total_size = 0
+                print()
+                for obj in tqdm.tqdm(loaded_objects, desc="Calculando tamanho", unit=" documentos", leave=True):
+                    total_size += len(str(obj))  # Aproximação do tamanho em bytes
+
+                size_in_mb = total_size / (1024 * 1024)  # Converte bytes para MB
+                logging.info(f"📊 Tamanho estimado da coleção (em memória): {size_in_mb:.2f} MB")
+                return size_in_mb
+
+            # Se não foram carregados objetos, usar o comando `collStats`
+            logging.info("Calculando tamanho da coleção diretamente do banco de dados...")
+            stats = self.attempts_collection.database.command("collStats", self.attempts_collection.name)
+            size_in_mb = stats["size"] / (1024 * 1024)  # Converte bytes para MB
+            logging.info(f"📊 Tamanho da coleção no banco: {size_in_mb:.2f} MB")
+            return size_in_mb
+
+        except Exception as e:
+            logging.error(f"❌ Erro ao obter tamanho da coleção: {e}")
+            return None

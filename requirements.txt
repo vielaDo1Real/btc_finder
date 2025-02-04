@@ -1,5 +1,8 @@
 logging==0.4.9.6
-pymongo==4.10.1
+pymongo==4.10.1 # não instalar o bson após instalar o pymongo
 tqdm==4.67.1
 bip_utils==2.9.3
 requests==2.32.3
+tqdm==4.67.1
+mnemonic==0.21
+psutil==6.1.1

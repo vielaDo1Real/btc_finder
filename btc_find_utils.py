@@ -2,6 +2,8 @@ import logging
 import time
 import multiprocessing
 import string
+import unicodedata
+import sys
 
 
 class BtcFindUtils:
@@ -23,6 +25,10 @@ class BtcFindUtils:
 
     def int_to_hex(self, value):
         return hex(value)[2:].zfill(64)
+    
+    def handle_exit(signal, frame):
+        print("\nEncerrando... Aguarde.")
+        sys.exit(0)
 
 
 class WordCompare:
@@ -38,16 +44,20 @@ class WordCompare:
 
     @staticmethod
     def preprocess_text(text):
-        if type(text) == list:
+        if isinstance(text, list):
             text = ' '.join(text)
-        """Pré-processa o texto para remover pontuação e normalizar palavras."""
         translator = str.maketrans('', '', string.punctuation)  # Remove pontuação
-        words = text.translate(translator).lower().split()  # Converte para minúsculas e divide em palavras
+        text = text.translate(translator).lower()  # Remove pontuação e converte para minúsculas
+        text = unicodedata.normalize('NFD', text)  # Normaliza para decomposição
+        words = text.split()  # Divide em palavras
         words = [word.strip() for word in words if word.strip()]  # Remove palavras vazias
         return words
 
+
     def find_possible_words(self, text, language="english"):
-        if type(text) == list:
-            words_in_text = ' '.join(text)
         words_in_text = self.preprocess_text(text)
-        return [word for word in words_in_text if word in self.wordlist]
+        found_words = set()
+        for word in words_in_text:
+            if word in self.wordlist and word not in found_words:
+                found_words.add(word)
+        return list(found_words)
