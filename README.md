@@ -23,7 +23,9 @@ python3 btc_finder.py
 ```
 [![Demonstração de uso]](https://www.youtube.com/watch?v=igaNrEXukRA)
 
-Ajude-nos a continuar o projeto! Veja as próximas implementações:
+(Qualquer dúvida ou sugestão -> https://discord.gg/hJWFeTFN)
+
+Ajude-nos a continuar o projeto! Próximas implementações: 
 
 ![BTC Wallet](apoio/BTC_address.jpg) BTC ```bc1q6e78uszvaahp2zdn67na2hyl5ycl9kfsmurmtk```
 
