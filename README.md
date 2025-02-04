@@ -25,8 +25,8 @@ python3 btc_finder.py
 
 Ajude-nos a continuar o projeto! Veja as próximas implementações:
 
-![BTC Wallet]BTC ```bc1q6e78uszvaahp2zdn67na2hyl5ycl9kfsmurmtk```(apoio/BTC_address.jpg)
+![BTC Wallet](apoio/BTC_address.jpg) BTC ```bc1q6e78uszvaahp2zdn67na2hyl5ycl9kfsmurmtk```
 
-![Solana Wallet]Solana ```J7z6qmPsJXMAPNQHKmKrNjEDLVJoHh7bazETmwMr2SZH```(apoio/Solana_address.jpg)
+![Solana Wallet](apoio/Solana_address.jpg) Solana ```J7z6qmPsJXMAPNQHKmKrNjEDLVJoHh7bazETmwMr2SZH```
 
-![Ethereum/EVM Wallet]Ethereum/EVM ```0x2Fe1046347e4A93C469fBDA0d84dE635e33D1a42```(apoio/Ethereum-EVM_address.jpg)
+![Ethereum/EVM Wallet](apoio/Ethereum-EVM_address.jpg) Ethereum/EVM ```0x2Fe1046347e4A93C469fBDA0d84dE635e33D1a42```
