@@ -25,7 +25,13 @@ python3 btc_finder.py
 
 (Qualquer dúvida ou sugestão -> https://discord.gg/hJWFeTFN)
 
-Ajude-nos a continuar o projeto! Próximas implementações: 
+Ajude-nos a continuar o projeto! Próximas implementações:
+
+* Testes automátios
+* Multiprocessing
+* Monitor de hardware
+* Gerenciador automático de desempenho do hardware de acordo com o consumo
+### A intenção de acordo com o apoio é a implementação de uma POOL online de código aberto 
 
 ![BTC Wallet](apoio/BTC_address.jpg) BTC ```bc1q6e78uszvaahp2zdn67na2hyl5ycl9kfsmurmtk```
 
