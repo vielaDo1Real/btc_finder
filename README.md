@@ -27,7 +27,7 @@ python3 btc_finder.py
 
 Ajude-nos a continuar o projeto! Próximas implementações:
 
-* Testes automátios
+* Testes automáticos
 * Multiprocessing
 * Monitor de hardware
 * Gerenciador automático de desempenho do hardware de acordo com o consumo
