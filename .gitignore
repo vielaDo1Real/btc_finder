@@ -21,6 +21,8 @@ sdist/
 var/
 wheels/
 Scripts/
+node_modules/
+Include/
 share/python-wheels/
 *.egg-info/
 .installed.cfg
@@ -138,3 +140,8 @@ addresses.csv
 bip39_v1.py.old
 file_wallets.py
 check_wallet_balance.py
+teste.js
+teste.py
+input.txt
+.gitignore
+token_cacatal.txt

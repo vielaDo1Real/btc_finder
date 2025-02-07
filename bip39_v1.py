@@ -1,5 +1,5 @@
 import logging
-from pymongo import MongoClient, UpdateOne, ASCENDING
+from pymongo import UpdateOne, ASCENDING
 from bip_utils import Bip39SeedGenerator, Bip44, Bip44Coins
 import itertools
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -12,11 +12,6 @@ from mnemonic import Mnemonic
 from btc_find_utils import BtcFindUtils, WordCompare
 from  mongo_main import MongoMain
 from monitor import HardwareMonitor
-
-client = MongoClient('localhost', 27017)
-db = client['bip39']
-attempts_collection = db['bip39_attempts']
-verified_collection = db['bip39_verified']
 
 
 class Bip39V:
@@ -138,7 +133,7 @@ class Bip39V:
                         executor.shutdown(wait=False)
             
             elif type_gen == "sequence":
-                combinations_progress = tqdm(desc="Gerando combinações em sequenciais", unit=" frases", position=0)
+                combinations_progress = tqdm(desc="Gerando combinações em sequenciais", unit=" frases", position=1)
                 with ThreadPoolExecutor(max_workers=num_threads) as executor:
                     futures = set()  # Conjunto para rastrear threads ativas
             
@@ -225,7 +220,7 @@ class Bip39V:
 
                 # Atualização em lote no MongoDB
                 if updates:
-                    attempts_collection.bulk_write(
+                    self.db.attempts_collection.bulk_write(
                         [UpdateOne(u['filter'], u['update']) for u in updates]
                     )
                 
