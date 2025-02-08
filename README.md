@@ -1,6 +1,6 @@
 # btc_finder
 A simple script written in python inspired by BTC Puzzle.
-
+ 
 * The project was inspired by Bitcoin Puzzle.
 * The objective of the project is to expand knowledge in the process of generating Bitcoin keys and addresses.
 
@@ -23,14 +23,13 @@ python3 btc_finder.py
 ```
 [![Demonstração de uso]](https://www.youtube.com/watch?v=igaNrEXukRA)
 
-(Qualquer dúvida ou sugestão -> https://discord.gg/hJWFeTFN)
+(Qualquer dúvida ou sugestão -> https://discord.gg/VFx3KkAame)
 
 Ajude-nos a continuar o projeto! Próximas implementações:
 
 * Testes automatizados
-* Multiprocessing
 * Monitor de hardware
-* Gerenciador automático de desempenho do hardware de acordo com o consumo
+
 ### A intenção de acordo com o apoio é a implementação de uma POOL online de código aberto 
 
 ![BTC Wallet](apoio/BTC_address.jpg) BTC ```bc1q6e78uszvaahp2zdn67na2hyl5ycl9kfsmurmtk```
