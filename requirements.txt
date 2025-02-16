@@ -6,3 +6,4 @@ requests==2.32.3
 tqdm==4.67.1
 mnemonic==0.21
 psutil==6.1.1
+bit==0.8.0
