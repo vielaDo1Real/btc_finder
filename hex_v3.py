@@ -52,8 +52,8 @@ def public_key_to_address(public_key_hex):
 
 class HexV():
     def __init__(self):
-        self.start_key_hex = "0000000000000000000000000000000000000000000000040000000000000000"
-        self.stop_key_hex = "000000000000000000000000000000000000000000000007ffffffffffffffff"
+        self.start_key_hex = "0000000000000000000000000000000000000000000000400000000000000000"
+        self.stop_key_hex = "00000000000000000000000000000000000000000000007fffffffffffffffff"
         self.target_address = '1BY8GQbnueYofwSuFAT3USAhGjPrkxDdW9'
         self.db = MongoMain('hex')
         self.start_key_int = int(self.start_key_hex, 16)
