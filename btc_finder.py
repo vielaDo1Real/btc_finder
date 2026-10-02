@@ -10,11 +10,13 @@ from bip39_v1 import Bip39V
 from hex_v3 import HexV
 from btc_find_utils import BtcFindUtils
 from interact_pool import InteractPool
+from address_compare import compare_menu
 
 # Constantes para as opções do menu
 HEX_FINDER = '1'
 BIP39_FINDER = '2'
 INTERACT_POOL = '3'
+ADDRESS_COMPARE = '4'
 
 # Configuração do logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -42,6 +44,8 @@ def hex_finder_menu():
     database_insert = input("Armazenar no banco de dados [s/n]: ").strip().lower() == 's'
     
     if database_insert:
+        # duplicate_address = db.find_duplicate_addresses()
+        # print(f"Endereços duplicados encontrados: {len(duplicate_address)}")
         attempted_keys = db.load_attempted_keys()
         last_tested_key = db.load_state() or hex_finder.start_key_int
         if last_tested_key:
@@ -141,7 +145,9 @@ def interact_pool_menu():
 def main():
     while True:
         clear_screen()
-        option = input('Para Hex Finder, digite 1. Para Bip39 Finder, digite 2. Para interagir com a Pool, digite 3: ')
+        option = input(
+            '1 Hex Finder | 2 Bip39 Finder | 3 Pool (manutenção) | 4 Comparar endereços com saldo: '
+        )
         
         if option == HEX_FINDER:
             hex_finder_menu()
@@ -149,8 +155,10 @@ def main():
             bip39_finder_menu()
         elif option == INTERACT_POOL:
             interact_pool_menu()
+        elif option == ADDRESS_COMPARE:
+            compare_menu()
         else:
-            print("Opção inválida. Escolha 1, 2 ou 3.")
+            print("Opção inválida. Escolha 1, 2, 3 ou 4.")
             time.sleep(1)
 
 if __name__ == "__main__":

@@ -146,3 +146,5 @@ input.txt
 .gitignore
 token_cacatal.txt
 progress.txt
+data/funded/
+Latest_Rich_Bitcoin_P2PKH.txt

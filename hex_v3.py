@@ -7,11 +7,6 @@ from pymongo import ASCENDING, UpdateOne
 from pymongo.errors import BulkWriteError
 from multiprocessing import Pool, Manager
 from concurrent.futures import ThreadPoolExecutor
-from threading import Thread
-import hashlib
-import ecdsa
-import base58
-from hashlib import sha256
 import threading
 from queue import Queue
 
@@ -20,41 +15,20 @@ from btc_find_utils import BtcFindUtils
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-def private_key_to_wif(private_key_hex):
-    extended_key = b"\x80" + bytes.fromhex(private_key_hex)  # Adiciona prefixo 0x80
-    first_sha256 = sha256(extended_key).digest()
-    second_sha256 = sha256(first_sha256).digest()
-    checksum = second_sha256[:4]  # Pegamos os primeiros 4 bytes como checksum
-    return base58.b58encode(extended_key + checksum).decode()
+"""
+10. Geração “randômica” ainda itera o range inteiro
+for _ in range(start, stop + 1) no puzzle 71 é 2^70 voltas.
+Random não reduz o espaço; só embaralha. 
+Para experimento, limite por número de tentativas, não pelo tamanho do intervalo.
+"""
 
-def private_key_to_public_key(private_key_hex):
-    private_key_bytes = bytes.fromhex(private_key_hex)
-    sk = ecdsa.SigningKey.from_string(private_key_bytes, curve=ecdsa.SECP256k1)
-    vk = sk.verifying_key
-    public_key = b"\x04" + vk.to_string()  # Prefixo 0x04 indica chave não comprimida
-    return public_key.hex()
-
-def public_key_to_address(public_key_hex):
-    public_key_bytes = bytes.fromhex(public_key_hex)
-
-    sha256_hash = sha256(public_key_bytes).digest()
-    ripemd160 = hashlib.new('ripemd160')
-    ripemd160.update(sha256_hash)
-    public_key_hash = ripemd160.digest()
-
-    extended_key = b"\x00" + public_key_hash
-    first_sha256 = sha256(extended_key).digest()
-    second_sha256 = sha256(first_sha256).digest()
-    checksum = second_sha256[:4]  # Pegamos os primeiros 4 bytes como checksum
-
-    address = base58.b58encode(extended_key + checksum).decode()
-    return address
 
 class HexV():
     def __init__(self):
+        # Implementar a geração de inicio e fim de range de forma randômica, com base no último estado salvo no banco de dados.
         self.start_key_hex = "0000000000000000000000000000000000000000000000400000000000000000"
         self.stop_key_hex = "00000000000000000000000000000000000000000000007fffffffffffffffff"
-        self.target_address = '1BY8GQbnueYofwSuFAT3USAhGjPrkxDdW9'
+        self.target_address = '1PWo3JeB9jrGwfHDNpdGK54CRas7fsVzXU'
         self.db = MongoMain('hex')
         self.start_key_int = int(self.start_key_hex, 16)
         self.index_db = self.db.attempts_collection.create_index([("is_verified", ASCENDING)], background=True)
@@ -87,8 +61,9 @@ class HexV():
                 if priv_key_hex in attempted_keys:
                     continue
 
-                public_key = private_key_to_public_key(priv_key_hex)
-                btc_address = public_key_to_address(public_key)
+                public_key = self.utils.private_key_to_public_key(priv_key_hex)
+                btc_address = self.utils.public_key_to_address(public_key)
+                # print("BTC_ADDRESS: ", btc_address)
 
                 # Adiciona a chave à lista de chaves a serem inseridas
                 keys_to_insert.append({
@@ -171,8 +146,8 @@ class HexV():
                 if priv_key_hex in attempted_keys:
                     continue
 
-                public_key = private_key_to_public_key(priv_key_hex)
-                btc_address = public_key_to_address(public_key)
+                public_key = self.utils.private_key_to_public_key(priv_key_hex)
+                btc_address = self.utils.public_key_to_address(public_key)
 
                 # Adiciona a chave à lista de chaves a serem inseridas
                 keys_to_insert.append({
@@ -239,7 +214,7 @@ class HexV():
         # Esperar o thread de progresso terminar
         progress_thread.join()
 
-
+    """
     def hex_run_multiprocessing(self, start, stop, num_cores, type_op=None):
         manager = Manager()
         attempted_keys = manager.dict()  # Dicionário compartilhado para evitar chaves repetidas
@@ -270,6 +245,7 @@ class HexV():
                 result.wait()  # Aguarda que todos os processos finalizem corretamente
 
         print("✅ Processamento finalizado!")
+    """
 
     @staticmethod
     def _generate_keys_in_range(start, stop, attempted_keys, progress_queue, batch_size=1000):
@@ -278,7 +254,7 @@ class HexV():
 
         for key_int in range(start, stop + 1):
             priv_key_hex = utils.int_to_hex(key_int)
-            public_key = private_key_to_public_key(priv_key_hex)
+            public_key = utils.private_key_to_public_key(priv_key_hex)
             attempted_keys[priv_key_hex] = True  # Marca a chave como tentada
             key = Key.from_hex(priv_key_hex)
             btc_address = key.address
@@ -294,7 +270,11 @@ class HexV():
         if local_count > 0:
             progress_queue.put(local_count)
 
-
+    # Modificação referente ao batch_size -> linha 272
+    # Atualização e reestruturação
+    """
+    # O while running: time.sleep(0.1) nunca recebe SIGINT (o handler está comentado no BIP39). CTRL+C não encerra de forma limpa; o exit() no meio do with também é brusco.
+    """
     def verify_key(self, target_address, batch_size=1000, num_threads=4):
         global running
         running = True  # Define o estado inicial como "executando"

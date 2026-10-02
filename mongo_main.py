@@ -8,7 +8,17 @@ from btc_find_utils import BtcFindUtils
 
 class MongoMain:
     def __init__(self, database):
-        self.client = MongoClient('localhost', 27017)
+        from pymongo.errors import ConnectionFailure, ServerSelectionTimeoutError
+
+        self.client = MongoClient('localhost', 27017, serverSelectionTimeoutMS=5000)
+        try:
+            self.client.admin.command('ping')
+        except (ConnectionFailure, ServerSelectionTimeoutError):
+            logging.error("MongoDB indisponível em localhost:27017. Verifique se o serviço está rodando (Get-Service MongoDB).")
+            raise SystemExit(1)
+
+        # Modificação referente ao instanciação redundante -> linha 13 
+        # self.client = MongoClient('localhost', 27017)
         self.database = database
         if database == 'bip39':
             self.db_bip39 = self.client['bip39']
@@ -22,6 +32,18 @@ class MongoMain:
             self.db_pool = self.client['pool']
             self.attempts_collection = self.db_pool['pool_attempts']
             self.state_collection = self.db_pool['pool_state']
+        elif database == 'funded':
+            self.db_funded = self.client['funded']
+            self.funded_collection = self.db_funded['btc_addresses']
+            self.matches_collection = self.db_funded['matches']
+            self.attempts_collection = self.funded_collection
+            self.funded_collection.create_index('address', unique=True, background=True)
+            self.matches_collection.create_index('address', background=True)
+            self.matches_collection.create_index(
+                [('source_db', 1), ('address', 1)],
+                unique=True,
+                background=True,
+            )
         else:
             raise ValueError("Database not found")
 
@@ -228,3 +250,134 @@ class MongoMain:
         except Exception as e:
             logging.error(f"❌ Erro ao obter tamanho da coleção: {e}")
             return None
+
+    def find_duplicate_addresses(self, limit=None):
+        try:
+            pipeline = [
+                {
+                    "$group": {
+                        "_id": "$address",
+                        "count": {"$sum": 1},
+                        "ids": {"$push": "$_id"}
+                    }
+                },
+                {
+                    "$match": {
+                        "count": {"$gt": 1}
+                    }
+                },
+                {
+                    "$sort": {
+                        "count": -1
+                    }
+                }
+            ]
+
+            if limit:
+                pipeline.append({"$limit": limit})
+
+            duplicates = list(
+                self.attempts_collection.aggregate(
+                    pipeline,
+                    allowDiskUse=True
+                )
+            )
+
+            logging.info(
+                f"Encontrados {len(duplicates)} endereços duplicados."
+            )
+
+            return duplicates
+
+        except Exception as e:
+            logging.error(
+                f"Erro ao localizar endereços duplicados: {e}"
+            )
+            return []
+
+    def upsert_funded_addresses(self, docs):
+        from datetime import datetime, timezone
+        from pymongo import UpdateOne
+        from pymongo.errors import BulkWriteError
+
+        if self.database != 'funded' or not docs:
+            return {'upserted': 0, 'modified': 0}
+
+        now = datetime.now(timezone.utc)
+        ops = []
+        for doc in docs:
+            address = doc.get('address')
+            if not address:
+                continue
+            update = {
+                '$set': {
+                    'address': address,
+                    'updated_at': now,
+                },
+                '$addToSet': {'sources': doc.get('source', 'unknown')},
+                '$setOnInsert': {'created_at': now},
+            }
+            if doc.get('balance_satoshi') is not None:
+                update['$max'] = {'balance_satoshi': doc['balance_satoshi']}
+            ops.append(UpdateOne({'address': address}, update, upsert=True))
+
+        if not ops:
+            return {'upserted': 0, 'modified': 0}
+
+        try:
+            result = self.funded_collection.bulk_write(ops, ordered=False)
+            return {
+                'upserted': result.upserted_count,
+                'modified': result.modified_count,
+            }
+        except BulkWriteError as e:
+            logging.error(f"Erro ao importar endereços com saldo: {e.details}")
+            return {'upserted': 0, 'modified': 0}
+
+    def find_funded_by_addresses(self, addresses):
+        if self.database != 'funded' or not addresses:
+            return {}
+        cursor = self.funded_collection.find(
+            {'address': {'$in': list(addresses)}},
+            {'_id': 0, 'address': 1, 'balance_satoshi': 1, 'sources': 1},
+        )
+        return {doc['address']: doc for doc in cursor}
+
+    def save_address_matches(self, matches):
+        from datetime import datetime, timezone
+        from pymongo import UpdateOne
+        from pymongo.errors import BulkWriteError
+
+        if self.database != 'funded' or not matches:
+            return 0
+
+        now = datetime.now(timezone.utc)
+        ops = []
+        for match in matches:
+            ops.append(UpdateOne(
+                {
+                    'source_db': match['source_db'],
+                    'address': match['address'],
+                },
+                {
+                    '$set': {
+                        **match,
+                        'matched_at': now,
+                    }
+                },
+                upsert=True,
+            ))
+        try:
+            result = self.matches_collection.bulk_write(ops, ordered=False)
+            return result.upserted_count + result.modified_count
+        except BulkWriteError as e:
+            logging.error(f"Erro ao gravar cruzamentos: {e.details}")
+            return 0
+
+    def funded_stats(self):
+        if self.database != 'funded':
+            return {}
+        return {
+            'funded_count': self.funded_collection.count_documents({}),
+            'matches_count': self.matches_collection.count_documents({}),
+        }
